@@ -1,5 +1,7 @@
 // src/components/AdminWorldsPage.tsx
+
 import React, { useState, useEffect } from 'react';
+
 import './AdminWorldsPage.css';
 
 interface World {
@@ -33,7 +35,10 @@ const AdminWorldsPage: React.FC = () => {
   const [createLoading, setCreateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
+  const [selectedWorld, setSelectedWorld] = useState<World | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  
   const [createForm, setCreateForm] = useState<CreateWorldForm>({
     name: '',
     speed: 1.0,
@@ -63,7 +68,6 @@ const AdminWorldsPage: React.FC = () => {
 
   const handleCreateWorld = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!createForm.name.trim()) {
       setError('Název světa je povinný');
       return;
@@ -72,7 +76,6 @@ const AdminWorldsPage: React.FC = () => {
     try {
       setCreateLoading(true);
       setError(null);
-      
       const response = await fetch('http://localhost:3001/api/admin/worlds', {
         method: 'POST',
         headers: {
@@ -101,7 +104,6 @@ const AdminWorldsPage: React.FC = () => {
           barbarianSpawnChance: 100,
           maxPlayers: 500
         });
-        
         // Aktualizace seznamu světů
         fetchWorlds();
       } else {
@@ -112,6 +114,49 @@ const AdminWorldsPage: React.FC = () => {
       console.error('Error creating world:', err);
     } finally {
       setCreateLoading(false);
+    }
+  };
+
+  const handleDeleteWorld = async (worldId: number) => {
+    try {
+      setDeleteLoading(true);
+      setError(null);
+      
+      const response = await fetch(`http://localhost:3001/api/admin/worlds/${worldId}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setSuccess(data.message);
+        setShowDeleteConfirm(null);
+        // Aktualizace seznamu světů
+        fetchWorlds();
+      } else {
+        setError(data.error || 'Chyba při mazání světa');
+      }
+    } catch (err) {
+      setError('Chyba při mazání světa');
+      console.error('Error deleting world:', err);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleShowWorldDetail = async (worldId: number) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/admin/worlds/${worldId}`);
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setSelectedWorld(data.world);
+      } else {
+        setError('Chyba při načítání detailu světa');
+      }
+    } catch (err) {
+      setError('Chyba při načítání detailu světa');
+      console.error('Error fetching world detail:', err);
     }
   };
 
@@ -149,7 +194,6 @@ const AdminWorldsPage: React.FC = () => {
     <div className="admin-worlds">
       <div className="admin-worlds__overlay"></div>
       <div className="admin-worlds__pattern"></div>
-      
       <div className="admin-worlds__container">
         {/* Header */}
         <div className="admin-worlds__header">
@@ -169,7 +213,7 @@ const AdminWorldsPage: React.FC = () => {
             <button onClick={() => setError(null)}>×</button>
           </div>
         )}
-        
+
         {success && (
           <div className="admin-worlds__message admin-worlds__message--success">
             {success}
@@ -192,7 +236,6 @@ const AdminWorldsPage: React.FC = () => {
         {showCreateForm && (
           <div className="admin-worlds__create-form">
             <h3 className="admin-worlds__form-title">Vytvořit Nový Svět</h3>
-            
             <form onSubmit={handleCreateWorld}>
               <div className="admin-worlds__form-group">
                 <label htmlFor="worldName">Název světa</label>
@@ -286,7 +329,7 @@ const AdminWorldsPage: React.FC = () => {
         {/* Worlds List */}
         <div className="admin-worlds__list">
           <h2 className="admin-worlds__list-title">Existující Světy</h2>
-          
+
           {loading ? (
             <div className="admin-worlds__loading">
               Načítání světů...
@@ -306,29 +349,33 @@ const AdminWorldsPage: React.FC = () => {
                       {getStatusText(world.status)}
                     </span>
                   </div>
-                  
+
                   <div className="admin-worlds__card-info">
                     <div className="admin-worlds__info-item">
                       <span style={{fontSize: '1rem'}}>👥</span>
                       <span>{world.currentPlayers} / {world.maxPlayers} hráčů</span>
                     </div>
-                    
                     <div className="admin-worlds__info-item">
                       <span style={{fontSize: '1rem'}}>🕐</span>
                       <span>Vytvořen: {formatDate(world.createdAt)}</span>
                     </div>
-                    
                     <div className="admin-worlds__info-item">
                       <span style={{fontSize: '1rem'}}>⚙️</span>
                       <span>Rychlost: {world.settings.speed}x</span>
                     </div>
                   </div>
-                  
+
                   <div className="admin-worlds__card-actions">
-                    <button className="admin-worlds__card-btn">
-                      Upravit
+                    <button 
+                      className="admin-worlds__card-btn"
+                      onClick={() => handleShowWorldDetail(world.id)}
+                    >
+                      Detail
                     </button>
-                    <button className="admin-worlds__card-btn admin-worlds__card-btn--danger">
+                    <button 
+                      className="admin-worlds__card-btn admin-worlds__card-btn--danger"
+                      onClick={() => setShowDeleteConfirm(world.id)}
+                    >
                       Smazat
                     </button>
                   </div>
@@ -337,6 +384,114 @@ const AdminWorldsPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="admin-worlds__modal-overlay">
+            <div className="admin-worlds__modal">
+              <h3 className="admin-worlds__modal-title">Potvrzení smazání</h3>
+              <p className="admin-worlds__modal-text">
+                Opravdu chcete smazat svět "{worlds.find(w => w.id === showDeleteConfirm)?.name}"?
+                <br />
+                <strong>Tato akce je nevratná!</strong>
+              </p>
+              <div className="admin-worlds__modal-actions">
+                <button
+                  onClick={() => setShowDeleteConfirm(null)}
+                  className="admin-worlds__btn admin-worlds__btn--secondary"
+                  disabled={deleteLoading}
+                >
+                  Zrušit
+                </button>
+                <button
+                  onClick={() => handleDeleteWorld(showDeleteConfirm)}
+                  className="admin-worlds__btn admin-worlds__btn--danger"
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? 'Maže se...' : 'Smazat Svět'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* World Detail Modal */}
+        {selectedWorld && (
+          <div className="admin-worlds__modal-overlay">
+            <div className="admin-worlds__modal admin-worlds__modal--large">
+              <div className="admin-worlds__modal-header">
+                <h3 className="admin-worlds__modal-title">Detail světa: {selectedWorld.name}</h3>
+                <button 
+                  onClick={() => setSelectedWorld(null)}
+                  className="admin-worlds__modal-close"
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="admin-worlds__modal-content">
+                <div className="admin-worlds__detail-grid">
+                  <div className="admin-worlds__detail-section">
+                    <h4>Základní informace</h4>
+                    <div className="admin-worlds__detail-item">
+                      <strong>ID:</strong> {selectedWorld.id}
+                    </div>
+                    <div className="admin-worlds__detail-item">
+                      <strong>Název:</strong> {selectedWorld.name}
+                    </div>
+                    <div className="admin-worlds__detail-item">
+                      <strong>Slug:</strong> {selectedWorld.slug}
+                    </div>
+                    <div className="admin-worlds__detail-item">
+                      <strong>Status:</strong> 
+                      <span className={`admin-worlds__status ${getStatusClass(selectedWorld.status)}`}>
+                        {getStatusText(selectedWorld.status)}
+                      </span>
+                    </div>
+                    <div className="admin-worlds__detail-item">
+                      <strong>Vytvořen:</strong> {formatDate(selectedWorld.createdAt)}
+                    </div>
+                  </div>
+
+                  <div className="admin-worlds__detail-section">
+                    <h4>Statistiky</h4>
+                    <div className="admin-worlds__detail-item">
+                      <strong>Hráči:</strong> {selectedWorld.currentPlayers} / {selectedWorld.maxPlayers}
+                    </div>
+                    <div className="admin-worlds__detail-item">
+                      <strong>Obsazenost:</strong> {((selectedWorld.currentPlayers / selectedWorld.maxPlayers) * 100).toFixed(1)}%
+                    </div>
+                  </div>
+
+                  <div className="admin-worlds__detail-section">
+                    <h4>Herní nastavení</h4>
+                    <div className="admin-worlds__detail-item">
+                      <strong>Rychlost hry:</strong> {selectedWorld.settings.speed}x
+                    </div>
+                    <div className="admin-worlds__detail-item">
+                      <strong>Rychlost jednotek:</strong> {selectedWorld.settings.unitSpeed}x
+                    </div>
+                    <div className="admin-worlds__detail-item">
+                      <strong>Šance na barbary:</strong> {selectedWorld.settings.barbarianSpawnChance}%
+                    </div>
+                    <div className="admin-worlds__detail-item">
+                      <strong>Maximum hráčů:</strong> {selectedWorld.settings.maxPlayers}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="admin-worlds__modal-actions">
+                <button
+                  onClick={() => setSelectedWorld(null)}
+                  className="admin-worlds__btn admin-worlds__btn--secondary"
+                >
+                  Zavřít
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
