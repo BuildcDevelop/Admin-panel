@@ -82,6 +82,24 @@ app.get('/api/admin/worlds/:id', (req, res) => {
   });
 });
 
+// ← JEDINÁ NOVÁ VĚC - endpoint pro tlačítko "Svět"
+app.get('/api/worlds/:worldSlug', (req, res) => {
+  const worldSlug = req.params.worldSlug;
+  const world = mockWorlds.find(w => w.slug === worldSlug);
+  
+  if (!world) {
+    return res.status(404).json({
+      success: false,
+      error: 'Svět nebyl nalezen'
+    });
+  }
+  
+  res.json({
+    success: true,
+    world: world
+  });
+});
+
 // Admin routes - POST endpoint pro vytváření světů
 app.post('/api/admin/worlds', (req, res) => {
   const { name, settings } = req.body;

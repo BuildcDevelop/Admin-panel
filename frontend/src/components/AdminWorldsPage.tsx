@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import './AdminWorldsPage.css';
+import { useNavigate } from 'react-router-dom'; // ← PŘIDÁNO
 
 interface World {
   id: number;
@@ -35,6 +36,8 @@ interface EditWorldForm {
 }
 
 const AdminWorldsPage: React.FC = () => {
+  const navigate = useNavigate(); // ← PŘIDÁNO
+  
   const [worlds, setWorlds] = useState<World[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -91,11 +94,10 @@ const AdminWorldsPage: React.FC = () => {
     }
   };
 
-  // Handler pro otevření světa
-  const handleOpenWorld = (worldSlug: string) => {
-    const worldUrl = `/world/${worldSlug}`;
-    window.open(worldUrl, '_blank');
-  };
+  // ← UPRAVENÁ FUNKCE - navigace v témže okně
+const handleOpenWorld = (worldSlug: string) => {
+  navigate(`/world/${worldSlug}`);
+};
 
   const handleCreateWorld = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -563,18 +565,13 @@ const AdminWorldsPage: React.FC = () => {
                       Detail
                     </button>
                     
-                    {/* NOVÉ TLAČÍTKO "SVĚT" */}
+                    {/* TLAČÍTKO "SVĚT" - naviguje na stránku světa */}
                     <button
                       className="admin-worlds__card-btn admin-worlds__card-btn--world"
                       onClick={() => handleOpenWorld(world.slug)}
                     >
                       🎮 Svět
                     </button>
-                    
-                    {/* DEBUG: Zobraz všechny možné stavy */}
-                    <div style={{fontSize: '0.7rem', color: '#666', marginBottom: '0.5rem'}}>
-                      Debug: Status = "{world.status}"
-                    </div>
                     
                     {/* Tlačítko Aktivovat pouze pro světy v přípravě */}
                     {world.status === 'preparing' && (

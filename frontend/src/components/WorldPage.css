@@ -1,0 +1,52 @@
+/* src/components/WorldPage.css */
+
+.world-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 25%, #0f766e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.world-page__container {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
+  padding: 3rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.world-page__title {
+  color: white;
+  font-size: 3rem;
+  font-weight: bold;
+  margin: 0 0 1rem 0;
+  text-shadow: 0 10px 15px rgba(0, 0, 0, 0.3);
+}
+
+.world-page__coming-soon {
+  color: #a7f3d0;
+  font-size: 1.5rem;
+  margin: 0 0 2rem 0;
+}
+
+.world-page__back-button {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.world-page__back-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+}
