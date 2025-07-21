@@ -1,3 +1,4 @@
+// backend/index.js
 import express from 'express';
 import cors from 'cors';
 
@@ -9,14 +10,7 @@ app.use(express.json());
 
 // Test route
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'Admin API running',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development'
-  });
+  res.json({ status: 'OK', message: 'Admin API running' });
 });
 
 // Admin routes - GET endpoint s mock daty
@@ -30,7 +24,13 @@ app.get('/api/admin/worlds', (req, res) => {
       status: 'active',
       currentPlayers: 45,
       maxPlayers: 500,
-      createdAt: '2025-01-15T10:00:00Z'
+      createdAt: '2025-01-15T10:00:00Z',
+      settings: {
+        speed: 1.0,
+        unitSpeed: 1.0,
+        barbarianSpawnChance: 100,
+        maxPlayers: 500
+      }
     }
   ];
   
