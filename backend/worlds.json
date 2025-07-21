@@ -4,10 +4,71 @@
       "id": 1,
       "name": "FlakyhoWorld",
       "slug": "flakyhoworld",
-      "status": "preparing",
+      "status": "paused",
       "currentPlayers": 0,
       "maxPlayers": 500,
       "createdAt": "2025-07-21T12:06:42.384Z",
+      "settings": {
+        "speed": 1,
+        "unitSpeed": 1,
+        "barbarianSpawnChance": 100,
+        "maxPlayers": 500
+      },
+      "pausedAt": "2025-07-21T13:49:01.508Z"
+    },
+    {
+      "id": 2,
+      "name": "FlakyhoWorld 2",
+      "slug": "flakyhoworld-2",
+      "status": "preparing",
+      "currentPlayers": 0,
+      "maxPlayers": 500,
+      "createdAt": "2025-07-21T13:31:28.887Z",
+      "settings": {
+        "speed": 1,
+        "unitSpeed": 1,
+        "barbarianSpawnChance": 100,
+        "maxPlayers": 500
+      }
+    },
+    {
+      "id": 3,
+      "name": "World 1",
+      "slug": "world-1",
+      "status": "preparing",
+      "currentPlayers": 0,
+      "maxPlayers": 500,
+      "createdAt": "2025-07-21T13:40:51.778Z",
+      "settings": {
+        "speed": 1,
+        "unitSpeed": 1,
+        "barbarianSpawnChance": 100,
+        "maxPlayers": 500
+      }
+    },
+    {
+      "id": 4,
+      "name": "World 2",
+      "slug": "world-2",
+      "status": "preparing",
+      "currentPlayers": 0,
+      "maxPlayers": 500,
+      "createdAt": "2025-07-21T13:47:17.437Z",
+      "settings": {
+        "speed": 1,
+        "unitSpeed": 1,
+        "barbarianSpawnChance": 100,
+        "maxPlayers": 500
+      }
+    },
+    {
+      "id": 5,
+      "name": "World",
+      "slug": "world",
+      "status": "preparing",
+      "currentPlayers": 0,
+      "maxPlayers": 500,
+      "createdAt": "2025-07-21T13:49:52.511Z",
       "settings": {
         "speed": 1,
         "unitSpeed": 1,

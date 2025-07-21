@@ -1,7 +1,6 @@
 // src/components/AdminWorldsPage.tsx
 
 import React, { useState, useEffect } from 'react';
-
 import './AdminWorldsPage.css';
 
 interface World {
@@ -28,6 +27,13 @@ interface CreateWorldForm {
   maxPlayers: number;
 }
 
+interface EditWorldForm {
+  speed: number;
+  unitSpeed: number;
+  barbarianSpawnChance: number;
+  maxPlayers: number;
+}
+
 const AdminWorldsPage: React.FC = () => {
   const [worlds, setWorlds] = useState<World[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,8 +45,21 @@ const AdminWorldsPage: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   
+  // Nové stavy pro editaci
+  const [editingWorld, setEditingWorld] = useState<World | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [showPauseConfirm, setShowPauseConfirm] = useState<number | null>(null);
+  const [pauseLoading, setPauseLoading] = useState(false);
+   
   const [createForm, setCreateForm] = useState<CreateWorldForm>({
     name: '',
+    speed: 1.0,
+    unitSpeed: 1.0,
+    barbarianSpawnChance: 100,
+    maxPlayers: 500
+  });
+
+  const [editForm, setEditForm] = useState<EditWorldForm>({
     speed: 1.0,
     unitSpeed: 1.0,
     barbarianSpawnChance: 100,
@@ -104,7 +123,6 @@ const AdminWorldsPage: React.FC = () => {
           barbarianSpawnChance: 100,
           maxPlayers: 500
         });
-        // Aktualizace seznamu světů
         fetchWorlds();
       } else {
         setError(data.error || 'Chyba při vytváření světa');
@@ -117,11 +135,72 @@ const AdminWorldsPage: React.FC = () => {
     }
   };
 
+  const handleEditWorld = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWorld) return;
+
+    try {
+      setEditLoading(true);
+      setError(null);
+      
+      const response = await fetch(`http://localhost:3001/api/admin/worlds/${editingWorld.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: editForm
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setSuccess(data.message);
+        setEditingWorld(null);
+        fetchWorlds();
+      } else {
+        setError(data.error || 'Chyba při úpravě světa');
+      }
+    } catch (err) {
+      setError('Chyba při úpravě světa');
+      console.error('Error updating world:', err);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handlePauseWorld = async (worldId: number) => {
+    try {
+      setPauseLoading(true);
+      setError(null);
+      
+      const response = await fetch(`http://localhost:3001/api/admin/worlds/${worldId}/pause`, {
+        method: 'PUT'
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setSuccess(data.message);
+        setShowPauseConfirm(null);
+        fetchWorlds();
+      } else {
+        setError(data.error || 'Chyba při pozastavování světa');
+      }
+    } catch (err) {
+      setError('Chyba při pozastavování světa');
+      console.error('Error pausing world:', err);
+    } finally {
+      setPauseLoading(false);
+    }
+  };
+
   const handleDeleteWorld = async (worldId: number) => {
     try {
       setDeleteLoading(true);
       setError(null);
-      
+       
       const response = await fetch(`http://localhost:3001/api/admin/worlds/${worldId}`, {
         method: 'DELETE'
       });
@@ -131,7 +210,6 @@ const AdminWorldsPage: React.FC = () => {
       if (response.ok && data.success) {
         setSuccess(data.message);
         setShowDeleteConfirm(null);
-        // Aktualizace seznamu světů
         fetchWorlds();
       } else {
         setError(data.error || 'Chyba při mazání světa');
@@ -148,7 +226,7 @@ const AdminWorldsPage: React.FC = () => {
     try {
       const response = await fetch(`http://localhost:3001/api/admin/worlds/${worldId}`);
       const data = await response.json();
-      
+       
       if (response.ok && data.success) {
         setSelectedWorld(data.world);
       } else {
@@ -158,6 +236,16 @@ const AdminWorldsPage: React.FC = () => {
       setError('Chyba při načítání detailu světa');
       console.error('Error fetching world detail:', err);
     }
+  };
+
+  const handleShowEditForm = (world: World) => {
+    setEditingWorld(world);
+    setEditForm({
+      speed: world.settings.speed,
+      unitSpeed: world.settings.unitSpeed,
+      barbarianSpawnChance: world.settings.barbarianSpawnChance,
+      maxPlayers: world.settings.maxPlayers
+    });
   };
 
   const getStatusText = (status: string) => {
@@ -366,13 +454,34 @@ const AdminWorldsPage: React.FC = () => {
                   </div>
 
                   <div className="admin-worlds__card-actions">
-                    <button 
+                    <button
                       className="admin-worlds__card-btn"
                       onClick={() => handleShowWorldDetail(world.id)}
                     >
                       Detail
                     </button>
-                    <button 
+                    
+                    {/* Tlačítko Editovat pouze pro aktivní světy */}
+                    {world.status === 'active' && (
+                      <button
+                        className="admin-worlds__card-btn admin-worlds__card-btn--edit"
+                        onClick={() => handleShowEditForm(world)}
+                      >
+                        Editovat
+                      </button>
+                    )}
+                    
+                    {/* Tlačítko Pozastavit pouze pro aktivní světy */}
+                    {world.status === 'active' && (
+                      <button
+                        className="admin-worlds__card-btn admin-worlds__card-btn--pause"
+                        onClick={() => setShowPauseConfirm(world.id)}
+                      >
+                        Pozastavit
+                      </button>
+                    )}
+                    
+                    <button
                       className="admin-worlds__card-btn admin-worlds__card-btn--danger"
                       onClick={() => setShowDeleteConfirm(world.id)}
                     >
@@ -384,6 +493,154 @@ const AdminWorldsPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Edit World Modal */}
+        {editingWorld && (
+          <div className="admin-worlds__modal-overlay">
+            <div className="admin-worlds__modal">
+              <div className="admin-worlds__modal-header">
+                <h3 className="admin-worlds__modal-title">
+                  Editovat svět: {editingWorld.name}
+                </h3>
+                <button
+                  onClick={() => setEditingWorld(null)}
+                  className="admin-worlds__modal-close"
+                  disabled={editLoading}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <form onSubmit={handleEditWorld}>
+                <div className="admin-worlds__modal-content">
+                  <div className="admin-worlds__form-row">
+                    <div className="admin-worlds__form-group">
+                      <label htmlFor="editSpeed">Rychlost hry</label>
+                      <select
+                        id="editSpeed"
+                        value={editForm.speed}
+                        onChange={(e) => setEditForm({...editForm, speed: Number(e.target.value)})}
+                        disabled={editLoading}
+                      >
+                        <option value={0.5}>0.5x (Pomalá)</option>
+                        <option value={1.0}>1.0x (Normální)</option>
+                        <option value={2.0}>2.0x (Rychlá)</option>
+                        <option value={5.0}>5.0x (Velmi rychlá)</option>
+                      </select>
+                    </div>
+
+                    <div className="admin-worlds__form-group">
+                      <label htmlFor="editUnitSpeed">Rychlost jednotek</label>
+                      <select
+                        id="editUnitSpeed"
+                        value={editForm.unitSpeed}
+                        onChange={(e) => setEditForm({...editForm, unitSpeed: Number(e.target.value)})}
+                        disabled={editLoading}
+                      >
+                        <option value={0.5}>0.5x (Pomalá)</option>
+                        <option value={1.0}>1.0x (Normální)</option>
+                        <option value={2.0}>2.0x (Rychlá)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="admin-worlds__form-row">
+                    <div className="admin-worlds__form-group">
+                      <label htmlFor="editBarbarianChance">Šance na barbary (%)</label>
+                      <input
+                        id="editBarbarianChance"
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={editForm.barbarianSpawnChance}
+                        onChange={(e) => setEditForm({...editForm, barbarianSpawnChance: Number(e.target.value)})}
+                        disabled={editLoading}
+                      />
+                    </div>
+
+                    <div className="admin-worlds__form-group">
+                      <label htmlFor="editMaxPlayers">Maximum hráčů</label>
+                      <select
+                        id="editMaxPlayers"
+                        value={editForm.maxPlayers}
+                        onChange={(e) => setEditForm({...editForm, maxPlayers: Number(e.target.value)})}
+                        disabled={editLoading}
+                      >
+                        <option value={100}>100 hráčů</option>
+                        <option value={500}>500 hráčů</option>
+                        <option value={1000}>1000 hráčů</option>
+                        <option value={2000}>2000 hráčů</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="admin-worlds__modal-actions">
+                  <button
+                    type="button"
+                    onClick={() => setEditingWorld(null)}
+                    className="admin-worlds__btn admin-worlds__btn--secondary"
+                    disabled={editLoading}
+                  >
+                    Zrušit
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editLoading}
+                    className="admin-worlds__btn admin-worlds__btn--primary"
+                  >
+                    {editLoading ? 'Ukládá se...' : 'Uložit změny'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Pause Confirmation Modal */}
+        {showPauseConfirm && (
+          <div className="admin-worlds__modal-overlay">
+            <div className="admin-worlds__modal">
+              <div className="admin-worlds__modal-header">
+                <h3 className="admin-worlds__modal-title">Pozastavit svět</h3>
+                <button
+                  onClick={() => setShowPauseConfirm(null)}
+                  className="admin-worlds__modal-close"
+                  disabled={pauseLoading}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="admin-worlds__modal-content">
+                <p className="admin-worlds__modal-text">
+                  Opravdu chcete pozastavit svět "{worlds.find(w => w.id === showPauseConfirm)?.name}"?
+                  <br /><br />
+                  <strong>Svět bude pozastaven a hráčům se zobrazí informační zpráva:</strong>
+                  <br />
+                  <em style={{color: '#a7f3d0'}}>"Svět byl z technických důvodů pozastaven."</em>
+                </p>
+              </div>
+              
+              <div className="admin-worlds__modal-actions">
+                <button
+                  onClick={() => setShowPauseConfirm(null)}
+                  className="admin-worlds__btn admin-worlds__btn--secondary"
+                  disabled={pauseLoading}
+                >
+                  Zrušit
+                </button>
+                <button
+                  onClick={() => handlePauseWorld(showPauseConfirm)}
+                  className="admin-worlds__btn admin-worlds__btn--warning"
+                  disabled={pauseLoading}
+                >
+                  {pauseLoading ? 'Pozastavuje se...' : 'Pozastavit Svět'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
@@ -421,14 +678,14 @@ const AdminWorldsPage: React.FC = () => {
             <div className="admin-worlds__modal admin-worlds__modal--large">
               <div className="admin-worlds__modal-header">
                 <h3 className="admin-worlds__modal-title">Detail světa: {selectedWorld.name}</h3>
-                <button 
+                <button
                   onClick={() => setSelectedWorld(null)}
                   className="admin-worlds__modal-close"
                 >
                   ×
                 </button>
               </div>
-              
+               
               <div className="admin-worlds__modal-content">
                 <div className="admin-worlds__detail-grid">
                   <div className="admin-worlds__detail-section">
@@ -443,7 +700,7 @@ const AdminWorldsPage: React.FC = () => {
                       <strong>Slug:</strong> {selectedWorld.slug}
                     </div>
                     <div className="admin-worlds__detail-item">
-                      <strong>Status:</strong> 
+                      <strong>Status:</strong>
                       <span className={`admin-worlds__status ${getStatusClass(selectedWorld.status)}`}>
                         {getStatusText(selectedWorld.status)}
                       </span>
@@ -480,7 +737,7 @@ const AdminWorldsPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+               
               <div className="admin-worlds__modal-actions">
                 <button
                   onClick={() => setSelectedWorld(null)}
