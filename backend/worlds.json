@@ -35,7 +35,7 @@
       "id": 3,
       "name": "Worl",
       "slug": "worl",
-      "status": "preparing",
+      "status": "active",
       "currentPlayers": 0,
       "maxPlayers": 500,
       "createdAt": "2025-07-21T13:58:58.556Z",
