@@ -342,6 +342,19 @@
   flex: 1;
 }
 
+.admin-worlds__card-btn--world {
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.admin-worlds__card-btn--world:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: #3b82f6;
+  color: #dbeafe;
+  transform: translateY(-1px);
+}
+
 .admin-worlds__status {
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;

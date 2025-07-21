@@ -56,7 +56,7 @@ const AdminWorldsPage: React.FC = () => {
   const [activateLoading, setActivateLoading] = useState(false);
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<number | null>(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
-   
+    
   const [createForm, setCreateForm] = useState<CreateWorldForm>({
     name: '',
     speed: 1.0,
@@ -89,6 +89,12 @@ const AdminWorldsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handler pro otevření světa
+  const handleOpenWorld = (worldSlug: string) => {
+    const worldUrl = `/world/${worldSlug}`;
+    window.open(worldUrl, '_blank');
   };
 
   const handleCreateWorld = async (e: React.FormEvent) => {
@@ -296,7 +302,7 @@ const AdminWorldsPage: React.FC = () => {
     try {
       setDeleteLoading(true);
       setError(null);
-       
+        
       const response = await fetch(`http://localhost:3001/api/admin/worlds/${worldId}`, {
         method: 'DELETE'
       });
@@ -322,7 +328,7 @@ const AdminWorldsPage: React.FC = () => {
     try {
       const response = await fetch(`http://localhost:3001/api/admin/worlds/${worldId}`);
       const data = await response.json();
-       
+        
       if (response.ok && data.success) {
         setSelectedWorld(data.world);
       } else {
@@ -555,6 +561,14 @@ const AdminWorldsPage: React.FC = () => {
                       onClick={() => handleShowWorldDetail(world.id)}
                     >
                       Detail
+                    </button>
+                    
+                    {/* NOVÉ TLAČÍTKO "SVĚT" */}
+                    <button
+                      className="admin-worlds__card-btn admin-worlds__card-btn--world"
+                      onClick={() => handleOpenWorld(world.slug)}
+                    >
+                      🎮 Svět
                     </button>
                     
                     {/* DEBUG: Zobraz všechny možné stavy */}
@@ -842,7 +856,7 @@ const AdminWorldsPage: React.FC = () => {
                   ×
                 </button>
               </div>
-               
+                
               <div className="admin-worlds__modal-content">
                 <div className="admin-worlds__detail-grid">
                   <div className="admin-worlds__detail-section">
@@ -894,7 +908,7 @@ const AdminWorldsPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-               
+                
               <div className="admin-worlds__modal-actions">
                 <button
                   onClick={() => setSelectedWorld(null)}
