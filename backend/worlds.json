@@ -1,3 +1,19 @@
 {
-  "worlds": []
+  "worlds": [
+    {
+      "id": 1,
+      "name": "FlakyhoWorld",
+      "slug": "flakyhoworld",
+      "status": "preparing",
+      "currentPlayers": 0,
+      "maxPlayers": 500,
+      "createdAt": "2025-07-21T12:06:42.384Z",
+      "settings": {
+        "speed": 1,
+        "unitSpeed": 1,
+        "barbarianSpawnChance": 100,
+        "maxPlayers": 500
+      }
+    }
+  ]
 }
