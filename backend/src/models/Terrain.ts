@@ -1,4 +1,4 @@
-// backend/src/models/Terrain.ts
+// Admin-panel/backend/src/models/Terrain.ts
 // Definice terénů a jejich vlastností
 
 export interface TerrainType {

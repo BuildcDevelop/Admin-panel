@@ -3,8 +3,8 @@
 
 import express from 'express';
 import { Pool } from 'pg';
-import { MapGenerator } from '../services/mapGenerator.js';
-import { MapTile, TerrainUtils } from '../models/Terrain.js';
+import { MapGenerator } from '../services/mapGenerator';
+import { MapTile, TerrainUtils } from '../models/Terrain';
 
 const router = express.Router();
 
