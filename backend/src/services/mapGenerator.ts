@@ -1,333 +1,385 @@
-// Admin-panel/backend/src/routes/adminRoutes.ts
-// Rozšířené admin API pro vytváření světů s automatickým generováním map
+// Admin-panel/backend/src/services/mapGenerator.ts
+// Služba pro generování herní mapy s algoritmy pro tvorbu přirozeného terénu
 
-import express from 'express';
-import { Pool } from 'pg';
-import { MapGenerator } from '../services/mapGenerator.js';
-import { MapTile, TerrainUtils } from '../models/Terrain.js';
+import { MapTile, TerrainUtils, MapGeneratorOptions, GeneratedMap } from '../models/Terrain';
 
-const router = express.Router();
-
-// PostgreSQL pool connection (přidat do vaší konfigurace)
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/verven',
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
-
-// Mockovaná databáze světů (zachovat pro kompatibilitu)
-let mockWorlds = [
-  {
-    id: 1,
-    name: 'Hlavní server',
-    slug: 'hlavni-server',
-    status: 'active',
-    currentPlayers: 45,
-    maxPlayers: 500,
-    mapSizeX: 1000,
-    mapSizeY: 1000,
-    seed: 123456,
-    createdAt: '2025-01-15T10:00:00Z',
-    settings: {
-      speed: 1.0,
-      unitSpeed: 1.0,
-      barbarianSpawnChance: 100,
-      maxPlayers: 500
-    }
+// Simple noise implementace pro generování přirozeného terénu
+class SimpleNoise {
+  private seed: number;
+  
+  constructor(seed: number) {
+    this.seed = seed;
   }
-];
 
-let nextWorldId = 2;
+  // Jednoduchý hash pro seed
+  public hash(x: number, y: number): number {
+    let h = this.seed + x * 374761393 + y * 668265263;
+    h = (h ^ (h >> 13)) * 1274126177;
+    return (h ^ (h >> 16)) / 2147483648.0;
+  }
 
-/**
- * POST /api/admin/world/create - Nový endpoint pro vytváření světů s mapou
- */
-router.post('/world/create', async (req, res) => {
-  try {
-    const { name, mapSize, seed } = req.body;
+  // Interpolated noise
+  noise(x: number, y: number): number {
+    const intX = Math.floor(x);
+    const intY = Math.floor(y);
+    const fracX = x - intX;
+    const fracY = y - intY;
 
-    // Validace vstupu
-    if (!name || name.trim().length === 0) {
-      return res.status(400).json({
-        error: 'Název světa je povinný'
-      });
+    const a = this.hash(intX, intY);
+    const b = this.hash(intX + 1, intY);
+    const c = this.hash(intX, intY + 1);
+    const d = this.hash(intX + 1, intY + 1);
+
+    const i1 = this.interpolate(a, b, fracX);
+    const i2 = this.interpolate(c, d, fracX);
+
+    return this.interpolate(i1, i2, fracY);
+  }
+
+  private interpolate(a: number, b: number, x: number): number {
+    const ft = x * Math.PI;
+    const f = (1 - Math.cos(ft)) * 0.5;
+    return a * (1 - f) + b * f;
+  }
+
+  // Fractal noise pro komplexnější terén
+  fractalNoise(x: number, y: number, octaves: number): number {
+    let value = 0;
+    let amplitude = 1;
+    let frequency = 1;
+    let maxValue = 0;
+
+    for (let i = 0; i < octaves; i++) {
+      value += this.noise(x * frequency, y * frequency) * amplitude;
+      maxValue += amplitude;
+      amplitude *= 0.5;
+      frequency *= 2;
     }
 
-    if (!mapSize || !mapSize.width || !mapSize.height) {
-      return res.status(400).json({
-        error: 'Velikost mapy (width, height) je povinná'
-      });
-    }
+    return value / maxValue;
+  }
+}
 
-    if (mapSize.width < 100 || mapSize.width > 2000 || 
-        mapSize.height < 100 || mapSize.height > 2000) {
-      return res.status(400).json({
-        error: 'Velikost mapy musí být mezi 100x100 a 2000x2000'
-      });
-    }
+class MapGenerator {
+  private width: number;
+  private height: number;
+  private seed: number;
+  private noise: SimpleNoise;
 
-    console.log(`🌍 Začínám vytváření světa "${name}" (${mapSize.width}x${mapSize.height})`);
+  constructor(options: MapGeneratorOptions) {
+    this.width = options.width;
+    this.height = options.height;
+    this.seed = options.seed || TerrainUtils.getRandomSeed();
+    this.noise = new SimpleNoise(this.seed);
+  }
+
+  async generateMap(worldId: number): Promise<GeneratedMap> {
     const startTime = performance.now();
+    
+    console.log(`🌍 Generování mapy ${this.width}x${this.height} se seedem ${this.seed}`);
+    
+    // Inicializace základní mapy s pláněmi
+    const tiles: MapTile[] = [];
+    
+    // Krok 1: Vytvoření základního terénu pomocí Perlin noise
+    const terrainMap = this.generateBaseTerrain();
+    
+    // Krok 2: Přidání řek
+    this.addRivers(terrainMap);
+    
+    // Krok 3: Přidání jezer
+    this.addLakes(terrainMap);
+    
+    // Krok 4: Přidání lesů ve shlucích
+    this.addForestClusters(terrainMap);
+    
+    // Krok 5: Přidání horských pásem
+    this.addMountainRanges(terrainMap);
+    
+    // Krok 6: Vyhlazení terénu
+    this.smoothTerrain(terrainMap, 2);
 
-    // Generování seed pokud není poskytnut
-    const finalSeed = seed || TerrainUtils.getRandomSeed();
+    // Konverze 2D pole na MapTile[]
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        tiles.push({
+          worldId,
+          x,
+          y,
+          terrainType: terrainMap[y][x]
+        });
+      }
+    }
 
-    let client;
-    try {
-      client = await pool.connect();
-      await client.query('BEGIN');
+    // Výpočet statistik
+    const stats = this.calculateStats(tiles);
+    const generationTimeMs = Math.round(performance.now() - startTime);
 
-      // 1. Vytvoření záznamu světa
-      const worldResult = await client.query(`
-        INSERT INTO worlds (name, slug, status, map_size_x, map_size_y, seed, created_at, settings)
-        VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
-        RETURNING id, name, slug, status, map_size_x, map_size_y, seed, created_at
-      `, [
-        name.trim(),
-        name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
-        'preparing',
-        mapSize.width,
-        mapSize.height,
-        finalSeed,
-        JSON.stringify({
-          speed: 1.0,
-          unitSpeed: 1.0,
-          barbarianSpawnChance: 100,
-          maxPlayers: 500
-        })
-      ]);
+    console.log(`✅ Mapa vygenerována za ${generationTimeMs}ms`);
+    console.log(`📊 Statistiky:`, stats);
 
-      const world = worldResult.rows[0];
-      const worldId = world.id;
+    return {
+      tiles,
+      stats,
+      generationTimeMs,
+      seed: this.seed
+    };
+  }
 
-      console.log(`✅ Svět vytvořen s ID ${worldId}, generuji mapu...`);
+  private generateBaseTerrain(): ('plains' | 'forest' | 'mountain' | 'river' | 'lake')[][] {
+    const terrain: ('plains' | 'forest' | 'mountain' | 'river' | 'lake')[][] = [];
+    
+    // Inicializace s pláněmi
+    for (let y = 0; y < this.height; y++) {
+      terrain[y] = [];
+      for (let x = 0; x < this.width; x++) {
+        terrain[y][x] = 'plains';
+      }
+    }
+    
+    return terrain;
+  }
 
-      // 2. Generování mapy
-      const mapGenerator = new MapGenerator({
-        width: mapSize.width,
-        height: mapSize.height,
-        seed: finalSeed
-      });
-
-      const generatedMap = await mapGenerator.generateMap(worldId);
-
-      console.log(`📊 Mapa vygenerována: ${generatedMap.tiles.length} dlaždic za ${generatedMap.generationTimeMs}ms`);
-
-      // 3. Hromadné ukládání dlaždic do databáze (batch insert)
-      const batchSize = 1000;
-      for (let i = 0; i < generatedMap.tiles.length; i += batchSize) {
-        const batch = generatedMap.tiles.slice(i, i + batchSize);
+  private addRivers(terrain: ('plains' | 'forest' | 'mountain' | 'river' | 'lake')[][]) {
+    const numRivers = Math.floor(Math.min(this.width, this.height) / 200) + 2;
+    
+    for (let r = 0; r < numRivers; r++) {
+      // Náhodný začátek řeky z kraje mapy
+      let x: number, y: number;
+      let dx: number, dy: number;
+      
+      const side = Math.floor(this.noise.hash(r, 100) * 4);
+      
+      switch (side) {
+        case 0: // Shora
+          x = Math.floor(this.noise.hash(r, 101) * this.width);
+          y = 0;
+          dx = 0;
+          dy = 1;
+          break;
+        case 1: // Zprava
+          x = this.width - 1;
+          y = Math.floor(this.noise.hash(r, 102) * this.height);
+          dx = -1;
+          dy = 0;
+          break;
+        case 2: // Zezdola
+          x = Math.floor(this.noise.hash(r, 103) * this.width);
+          y = this.height - 1;
+          dx = 0;
+          dy = -1;
+          break;
+        default: // Zleva
+          x = 0;
+          y = Math.floor(this.noise.hash(r, 104) * this.height);
+          dx = 1;
+          dy = 0;
+          break;
+      }
+      
+      // Kreslení řeky
+      const maxLength = Math.min(this.width, this.height) * 0.8;
+      let length = 0;
+      
+      while (length < maxLength && x >= 0 && x < this.width && y >= 0 && y < this.height) {
+        terrain[y][x] = 'river';
         
-        const values: string[] = [];
-        const params: any[] = [];
-        let paramIndex = 1;
-
-        for (const tile of batch) {
-          values.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3})`);
-          params.push(worldId, tile.x, tile.y, tile.terrainType);
-          paramIndex += 4;
+        // Přidání náhodnosti do směru
+        const noiseValue = this.noise.noise(x * 0.1, y * 0.1);
+        
+        if (noiseValue > 0.3) {
+          // Zatočení doleva
+          const newDx = -dy;
+          const newDy = dx;
+          dx = newDx;
+          dy = newDy;
+        } else if (noiseValue < -0.3) {
+          // Zatočení doprava
+          const newDx = dy;
+          const newDy = -dx;
+          dx = newDx;
+          dy = newDy;
         }
-
-        await client.query(`
-          INSERT INTO map_tiles (world_id, x, y, terrain_type)
-          VALUES ${values.join(', ')}
-        `, params);
-
-        console.log(`💾 Uloženo ${Math.min(i + batchSize, generatedMap.tiles.length)}/${generatedMap.tiles.length} dlaždic`);
+        
+        x += dx;
+        y += dy;
+        length++;
       }
+    }
+  }
 
-      // 4. Uložení metadat
-      await client.query(`
-        INSERT INTO world_metadata (world_id, generation_time_ms, terrain_stats, generation_seed)
-        VALUES ($1, $2, $3, $4)
-      `, [
-        worldId,
-        generatedMap.generationTimeMs,
-        JSON.stringify(generatedMap.stats),
-        finalSeed
-      ]);
-
-      // 5. Aktualizace statusu světa na "active"
-      await client.query(`
-        UPDATE worlds SET status = 'active', updated_at = NOW() WHERE id = $1
-      `, [worldId]);
-
-      await client.query('COMMIT');
-
-      // 6. Vytvoření náhledu mapy (prvních 50x50 polí)
-      const previewSize = Math.min(50, mapSize.width, mapSize.height);
-      const mapPreview = generatedMap.tiles
-        .filter(tile => tile.x < previewSize && tile.y < previewSize)
-        .reduce((preview: any[][], tile) => {
-          if (!preview[tile.y]) preview[tile.y] = [];
-          preview[tile.y][tile.x] = {
-            x: tile.x,
-            y: tile.y,
-            terrainType: tile.terrainType,
-            color: TerrainUtils.getTerrainByName(tile.terrainType)?.color || '#000000'
-          };
-          return preview;
-        }, []);
-
-      const totalTime = Math.round(performance.now() - startTime);
-      console.log(`🎉 Svět "${name}" úspěšně vytvořen za ${totalTime}ms`);
-
-      // Response
-      res.json({
-        success: true,
-        worldId: worldId,
-        world: {
-          id: worldId,
-          name: world.name,
-          slug: world.slug,
-          status: 'active',
-          mapSize: {
-            width: world.map_size_x,
-            height: world.map_size_y
-          },
-          seed: finalSeed,
-          createdAt: world.created_at,
-          generationStats: {
-            totalTiles: generatedMap.tiles.length,
-            generationTimeMs: generatedMap.generationTimeMs,
-            totalTimeMs: totalTime,
-            terrainStats: generatedMap.stats
+  private addLakes(terrain: ('plains' | 'forest' | 'mountain' | 'river' | 'lake')[][]) {
+    const numLakes = Math.floor((this.width * this.height) / 50000) + 3;
+    
+    for (let l = 0; l < numLakes; l++) {
+      const centerX = Math.floor(this.noise.hash(l, 200) * (this.width - 20)) + 10;
+      const centerY = Math.floor(this.noise.hash(l, 201) * (this.height - 20)) + 10;
+      const radius = Math.floor(this.noise.hash(l, 202) * 8) + 3;
+      
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const x = centerX + dx;
+          const y = centerY + dy;
+          
+          if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const noiseValue = this.noise.noise(x * 0.2, y * 0.2);
+            
+            if (distance <= radius * (0.7 + noiseValue * 0.3)) {
+              terrain[y][x] = 'lake';
+            }
           }
-        },
-        mapPreview: mapPreview,
-        message: `Svět "${name}" byl úspěšně vytvořen s mapou ${mapSize.width}x${mapSize.height}!`
-      });
-
-    } catch (dbError) {
-      if (client) {
-        await client.query('ROLLBACK');
-      }
-      throw dbError;
-    } finally {
-      if (client) {
-        client.release();
+        }
       }
     }
-
-  } catch (error) {
-    console.error('❌ Chyba při vytváření světa:', error);
-    res.status(500).json({
-      error: 'Chyba při vytváření světa',
-      details: error instanceof Error ? error.message : 'Neznámá chyba'
-    });
   }
-});
 
-/**
- * GET /api/admin/world/:id/map - Získání dat mapy pro world
- */
-router.get('/world/:id/map', async (req, res) => {
-  try {
-    const worldId = parseInt(req.params.id);
-    const { startX = 0, startY = 0, width = 100, height = 100 } = req.query;
-
-    if (isNaN(worldId)) {
-      return res.status(400).json({ error: 'Neplatné ID světa' });
-    }
-
-    const client = await pool.connect();
-    try {
-      // Získání základních informací o světě
-      const worldResult = await client.query(`
-        SELECT w.*, wm.terrain_stats, wm.generation_time_ms
-        FROM worlds w
-        LEFT JOIN world_metadata wm ON w.id = wm.world_id
-        WHERE w.id = $1
-      `, [worldId]);
-
-      if (worldResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Svět nebyl nalezen' });
+  private addForestClusters(terrain: ('plains' | 'forest' | 'mountain' | 'river' | 'lake')[][]) {
+    const numClusters = Math.floor((this.width * this.height) / 30000) + 5;
+    
+    for (let c = 0; c < numClusters; c++) {
+      const centerX = Math.floor(this.noise.hash(c, 300) * this.width);
+      const centerY = Math.floor(this.noise.hash(c, 301) * this.height);
+      const radius = Math.floor(this.noise.hash(c, 302) * 20) + 10;
+      
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const x = centerX + dx;
+          const y = centerY + dy;
+          
+          if (x >= 0 && x < this.width && y >= 0 && y < this.height && 
+              terrain[y][x] === 'plains') {
+            
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const noiseValue = this.noise.noise(x * 0.15, y * 0.15);
+            
+            if (distance <= radius * (0.6 + noiseValue * 0.4)) {
+              terrain[y][x] = 'forest';
+            }
+          }
+        }
       }
-
-      const world = worldResult.rows[0];
-
-      // Získání dlaždic v požadované oblasti
-      const tilesResult = await client.query(`
-        SELECT x, y, terrain_type
-        FROM map_tiles
-        WHERE world_id = $1 
-        AND x >= $2 AND x < $3
-        AND y >= $4 AND y < $5
-        ORDER BY y, x
-      `, [
-        worldId,
-        parseInt(startX as string),
-        parseInt(startX as string) + parseInt(width as string),
-        parseInt(startY as string),
-        parseInt(startY as string) + parseInt(height as string)
-      ]);
-
-      const tiles = tilesResult.rows.map(row => ({
-        x: row.x,
-        y: row.y,
-        terrainType: row.terrain_type,
-        color: TerrainUtils.getTerrainByName(row.terrain_type)?.color || '#000000'
-      }));
-
-      res.json({
-        success: true,
-        world: {
-          id: world.id,
-          name: world.name,
-          mapSize: {
-            width: world.map_size_x,
-            height: world.map_size_y
-          },
-          seed: world.seed
-        },
-        viewport: {
-          startX: parseInt(startX as string),
-          startY: parseInt(startY as string),
-          width: parseInt(width as string),
-          height: parseInt(height as string)
-        },
-        tiles: tiles,
-        stats: world.terrain_stats ? JSON.parse(world.terrain_stats) : null,
-        generationTimeMs: world.generation_time_ms
-      });
-
-    } finally {
-      client.release();
     }
-
-  } catch (error) {
-    console.error('❌ Chyba při načítání mapy:', error);
-    res.status(500).json({
-      error: 'Chyba při načítání mapy',
-      details: error instanceof Error ? error.message : 'Neznámá chyba'
-    });
   }
-});
 
-// Zachovat existující API pro kompatibilitu
-router.get('/worlds', (req, res) => {
-  res.json({
-    worlds: mockWorlds,
-    total: mockWorlds.length
-  });
-});
-
-router.get('/worlds/:id', (req, res) => {
-  const worldId = parseInt(req.params.id);
-  const world = mockWorlds.find(w => w.id === worldId);
-  
-  if (!world) {
-    return res.status(404).json({
-      success: false,
-      error: 'Svět nebyl nalezen'
-    });
+  private addMountainRanges(terrain: ('plains' | 'forest' | 'mountain' | 'river' | 'lake')[][]) {
+    const numRanges = Math.floor(Math.min(this.width, this.height) / 300) + 2;
+    
+    for (let r = 0; r < numRanges; r++) {
+      // Náhodný začátek horského pásma
+      let x = Math.floor(this.noise.hash(r, 400) * this.width);
+      let y = Math.floor(this.noise.hash(r, 401) * this.height);
+      
+      // Náhodný směr
+      let dx = Math.floor(this.noise.hash(r, 402) * 3) - 1; // -1, 0, 1
+      let dy = Math.floor(this.noise.hash(r, 403) * 3) - 1;
+      
+      if (dx === 0 && dy === 0) {
+        dx = 1; // Zajistit, že se pásmo pohybuje
+      }
+      
+      const length = Math.floor(this.noise.hash(r, 404) * 50) + 30;
+      const width = Math.floor(this.noise.hash(r, 405) * 6) + 3;
+      
+      for (let i = 0; i < length; i++) {
+        for (let w = -width; w <= width; w++) {
+          const mountainX = x + w * (dy === 0 ? 1 : 0) + w * (dx === 0 ? 0 : Math.sign(dx));
+          const mountainY = y + w * (dx === 0 ? 1 : 0) + w * (dy === 0 ? 0 : Math.sign(dy));
+          
+          if (mountainX >= 0 && mountainX < this.width && 
+              mountainY >= 0 && mountainY < this.height &&
+              terrain[mountainY][mountainX] !== 'river' && 
+              terrain[mountainY][mountainX] !== 'lake') {
+            
+            const distanceFromCenter = Math.abs(w);
+            const noiseValue = this.noise.noise(mountainX * 0.1, mountainY * 0.1);
+            
+            if (distanceFromCenter <= width * (0.7 + noiseValue * 0.3)) {
+              terrain[mountainY][mountainX] = 'mountain';
+            }
+          }
+        }
+        
+        // Postupný posun pásma
+        x += dx;
+        y += dy;
+        
+        // Občasná změna směru
+        if (i % 10 === 0) {
+          const newDirection = this.noise.hash(r * 100 + i, 406);
+          if (newDirection > 0.7) {
+            dx = Math.floor(newDirection * 3) - 1;
+          } else if (newDirection < 0.3) {
+            dy = Math.floor(newDirection * 3) - 1;
+          }
+        }
+        
+        // Zajistit, že zůstane na mapě
+        if (x < 5 || x > this.width - 5) dx = -dx;
+        if (y < 5 || y > this.height - 5) dy = -dy;
+      }
+    }
   }
-  
-  res.json({
-    success: true,
-    world: world
-  });
-});
+
+  private smoothTerrain(terrain: ('plains' | 'forest' | 'mountain' | 'river' | 'lake')[][], passes: number) {
+    for (let pass = 0; pass < passes; pass++) {
+      const newTerrain = terrain.map(row => [...row]);
+      
+      for (let y = 1; y < this.height - 1; y++) {
+        for (let x = 1; x < this.width - 1; x++) {
+          // Zjistit nejčastější terén v okolí
+          const neighbors: { [key: string]: number } = {};
+          
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const neighborTerrain = terrain[y + dy][x + dx];
+              neighbors[neighborTerrain] = (neighbors[neighborTerrain] || 0) + 1;
+            }
+          }
+          
+          // Najít nejčastější terén
+          let mostCommon = terrain[y][x];
+          let maxCount = 0;
+          
+          for (const [terrainType, count] of Object.entries(neighbors)) {
+            if (count > maxCount) {
+              maxCount = count;
+              mostCommon = terrainType as any;
+            }
+          }
+          
+          // Vyhlazování pouze pro plains a forest
+          if ((terrain[y][x] === 'plains' || terrain[y][x] === 'forest') &&
+              maxCount >= 6) {
+            newTerrain[y][x] = mostCommon;
+          }
+        }
+      }
+      
+      // Kopírování zpět
+      for (let y = 0; y < this.height; y++) {
+        for (let x = 0; x < this.width; x++) {
+          terrain[y][x] = newTerrain[y][x];
+        }
+      }
+    }
+  }
+
+  private calculateStats(tiles: MapTile[]): { [key: string]: number } {
+    const stats: { [key: string]: number } = {};
+    const total = tiles.length;
+    
+    for (const tile of tiles) {
+      stats[tile.terrainType] = (stats[tile.terrainType] || 0) + 1;
+    }
+    
+    // Převést na procenta
+    for (const terrain in stats) {
+      stats[terrain] = Math.round((stats[terrain] / total) * 1000) / 10; // 1 desetinné místo
+    }
+    
+    return stats;
+  }
+}
 
 export default MapGenerator;

@@ -16,30 +16,6 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
-// Mockovaná databáze světů (zachovat pro kompatibilitu)
-let mockWorlds = [
-  {
-    id: 1,
-    name: 'Hlavní server',
-    slug: 'hlavni-server',
-    status: 'active',
-    currentPlayers: 45,
-    maxPlayers: 500,
-    mapSizeX: 1000,
-    mapSizeY: 1000,
-    seed: 123456,
-    createdAt: '2025-01-15T10:00:00Z',
-    settings: {
-      speed: 1.0,
-      unitSpeed: 1.0,
-      barbarianSpawnChance: 100,
-      maxPlayers: 500
-    }
-  }
-];
-
-let nextWorldId = 2;
-
 /**
  * POST /api/admin/world/create - Nový endpoint pro vytváření světů s mapou
  */
@@ -155,25 +131,19 @@ router.post('/world/create', async (req, res) => {
 
       await client.query('COMMIT');
 
-      // 6. Vytvoření náhledu mapy (prvních 50x50 polí)
-      const previewSize = Math.min(50, mapSize.width, mapSize.height);
-      const mapPreview = generatedMap.tiles
-        .filter(tile => tile.x < previewSize && tile.y < previewSize)
-        .reduce((preview: any[][], tile) => {
-          if (!preview[tile.y]) preview[tile.y] = [];
-          preview[tile.y][tile.x] = {
-            x: tile.x,
-            y: tile.y,
-            terrainType: tile.terrainType,
-            color: TerrainUtils.getTerrainByName(tile.terrainType)?.color || '#000000'
-          };
-          return preview;
-        }, []);
+      // 6. Vytvoření náhledu mapy (prvních 50x50 dlaždic pro response)
+      const previewTiles = generatedMap.tiles
+        .filter(tile => tile.x < 50 && tile.y < 50)
+        .map(tile => ({
+          x: tile.x,
+          y: tile.y,
+          terrainType: tile.terrainType,
+          color: TerrainUtils.getTerrainByName(tile.terrainType)?.color || '#000000'
+        }));
 
       const totalTime = Math.round(performance.now() - startTime);
-      console.log(`🎉 Svět "${name}" úspěšně vytvořen za ${totalTime}ms`);
+      console.log(`🎉 Svět "${name}" vytvořen úspěšně za ${totalTime}ms`);
 
-      // Response
       res.json({
         success: true,
         worldId: worldId,
@@ -183,20 +153,16 @@ router.post('/world/create', async (req, res) => {
           slug: world.slug,
           status: 'active',
           mapSize: {
-            width: world.map_size_x,
-            height: world.map_size_y
+            width: mapSize.width,
+            height: mapSize.height
           },
           seed: finalSeed,
-          createdAt: world.created_at,
-          generationStats: {
-            totalTiles: generatedMap.tiles.length,
-            generationTimeMs: generatedMap.generationTimeMs,
-            totalTimeMs: totalTime,
-            terrainStats: generatedMap.stats
-          }
+          createdAt: world.created_at
         },
-        mapPreview: mapPreview,
-        message: `Svět "${name}" byl úspěšně vytvořen s mapou ${mapSize.width}x${mapSize.height}!`
+        mapPreview: previewTiles,
+        stats: generatedMap.stats,
+        generationTimeMs: generatedMap.generationTimeMs,
+        message: `Svět "${name}" s mapou ${mapSize.width}x${mapSize.height} byl vytvořen úspěšně!`
       });
 
     } catch (dbError) {
@@ -211,7 +177,7 @@ router.post('/world/create', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('❌ Chyba při vytváření světa:', error);
+    console.error('❌ Chyba při vytváření světa s mapou:', error);
     res.status(500).json({
       error: 'Chyba při vytváření světa',
       details: error instanceof Error ? error.message : 'Neznámá chyba'
@@ -305,29 +271,11 @@ router.get('/world/:id/map', async (req, res) => {
   }
 });
 
-// Zachovat existující API pro kompatibilitu
-router.get('/worlds', (req, res) => {
-  res.json({
-    worlds: mockWorlds,
-    total: mockWorlds.length
-  });
-});
-
-router.get('/worlds/:id', (req, res) => {
-  const worldId = parseInt(req.params.id);
-  const world = mockWorlds.find(w => w.id === worldId);
-  
-  if (!world) {
-    return res.status(404).json({
-      success: false,
-      error: 'Svět nebyl nalezen'
-    });
-  }
-  
-  res.json({
-    success: true,
-    world: world
-  });
-});
+// ========================================
+// POZNÁMKA: Duplikované endpoints smazány!
+// ========================================
+// Endpoints /worlds a /worlds/:id byly smazány z adminRoutes.ts
+// protože vytvářely konflikt s mockWorlds z index.ts
+// Všechny legacy operace se teď dějí přímo v index.ts
 
 export default router;

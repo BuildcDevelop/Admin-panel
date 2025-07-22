@@ -21,10 +21,6 @@ app.use('/api/admin', adminRoutes);
 // LEGACY MOCK ENDPOINTY (pro kompatibilitu s frontendem)
 // =======================================================
 // Poznámka: Nové světy se vytváří přes POST /api/admin/world/create
-// =======================================================
-// LEGACY MOCK ENDPOINTY (pro kompatibilitu s frontendem)
-// =======================================================
-// Poznámka: Nové světy se vytváří přes POST /api/admin/world/create
 
 // Mockovaná databáze světů - rozšířená verze
 let mockWorlds = [
@@ -63,6 +59,20 @@ let mockWorlds = [
 // Globální ID counter pro nové světy
 let nextWorldId = 3;
 
+// ===== CHYBĚJÍCÍ ENDPOINTS - OPRAVENO =====
+
+// Health check endpoint (pro frontend)
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Admin API running',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 // LEGACY: Admin routes - GET endpoint s mock daty
 app.get('/api/admin/worlds', (req, res) => {
   res.json({
@@ -90,7 +100,7 @@ app.get('/api/admin/worlds/:id', (req, res) => {
   });
 });
 
-// LEGACY: Admin routes - POST endpoint pro vytváření světů (BEZ generování map)
+// LEGACY POST endpoint pro vytváření světů (BEZ generování map)
 app.post('/api/admin/worlds', (req, res) => {
   const { name, settings } = req.body;
   
@@ -131,192 +141,22 @@ app.post('/api/admin/worlds', (req, res) => {
   res.json({
     success: true,
     world: newWorld,
-    message: `Svět "${name}" byl vytvořen úspěšně! (LEGACY - bez mapy)`
+    message: `Svět "${name}" byl vytvořen úspěšně!`
   });
 });
 
-// LEGACY: Admin routes - PUT endpoint pro editaci světa
-app.put('/api/admin/worlds/:id', (req, res) => {
-  const worldId = parseInt(req.params.id);
-  const { settings } = req.body;
-  
-  // Najdi svět
-  const worldIndex = mockWorlds.findIndex(w => w.id === worldId);
-  if (worldIndex === -1) {
-    return res.status(404).json({
-      success: false,
-      error: 'Svět nebyl nalezen'
-    });
-  }
-  
-  const world = mockWorlds[worldIndex];
-  
-  // Zkontroluj, zda lze svět editovat
-  if (world.status !== 'active') {
-    return res.status(400).json({
-      success: false,
-      error: 'Lze editovat pouze aktivní světy'
-    });
-  }
-  
-  // Validace nastavení
-  if (!settings) {
-    return res.status(400).json({
-      success: false,
-      error: 'Nastavení jsou povinná'
-    });
-  }
-  
-  // Validace jednotlivých hodnot
-  if (settings.speed && (settings.speed < 0.1 || settings.speed > 10)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Rychlost hry musí být mezi 0.1 a 10'
-    });
-  }
-  
-  if (settings.unitSpeed && (settings.unitSpeed < 0.1 || settings.unitSpeed > 5)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Rychlost jednotek musí být mezi 0.1 a 5'
-    });
-  }
-  
-  if (settings.barbarianSpawnChance && (settings.barbarianSpawnChance < 0 || settings.barbarianSpawnChance > 100)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Šance na barbary musí být mezi 0 a 100'
-    });
-  }
-  
-  if (settings.maxPlayers && settings.maxPlayers < world.currentPlayers) {
-    return res.status(400).json({
-      success: false,
-      error: `Maximum hráčů nemůže být menší než současný počet hráčů (${world.currentPlayers})`
-    });
-  }
-  
-  // Aktualizuj nastavení
-  const updatedWorld = {
-    ...world,
-    settings: {
-      ...world.settings,
-      ...settings
-    },
-    maxPlayers: settings.maxPlayers || world.maxPlayers,
-    updatedAt: new Date().toISOString()
-  };
-  
-  // Ulož změny
-  mockWorlds[worldIndex] = updatedWorld;
-  
-  console.log('⚙️ Svět upraven (LEGACY):', updatedWorld);
-  
-  res.json({
-    success: true,
-    world: updatedWorld,
-    message: `Nastavení světa "${world.name}" bylo úspěšně změněno!`
-  });
-});
-
-// LEGACY: Další PUT/DELETE endpointy...
-app.put('/api/admin/worlds/:id/pause', (req, res) => {
-  const worldId = parseInt(req.params.id);
-  const worldIndex = mockWorlds.findIndex(w => w.id === worldId);
-  if (worldIndex === -1) {
-    return res.status(404).json({
-      success: false,
-      error: 'Svět nebyl nalezen'
-    });
-  }
-  
-  const world = mockWorlds[worldIndex];
-  if (world.status !== 'active') {
-    return res.status(400).json({
-      success: false,
-      error: 'Lze pozastavit pouze aktivní světy'
-    });
-  }
-  
-  const pausedWorld = { ...world, status: 'paused', pausedAt: new Date().toISOString() };
-  mockWorlds[worldIndex] = pausedWorld;
-  
-  console.log('⏸️ Svět pozastaven (LEGACY):', pausedWorld);
-  
-  res.json({
-    success: true,
-    world: pausedWorld,
-    message: `Svět "${world.name}" byl pozastaven.`
-  });
-});
-
-app.put('/api/admin/worlds/:id/resume', (req, res) => {
-  const worldId = parseInt(req.params.id);
-  const worldIndex = mockWorlds.findIndex(w => w.id === worldId);
-  if (worldIndex === -1) {
-    return res.status(404).json({
-      success: false,
-      error: 'Svět nebyl nalezen'
-    });
-  }
-  
-  const world = mockWorlds[worldIndex];
-  if (world.status !== 'paused') {
-    return res.status(400).json({
-      success: false,
-      error: 'Lze obnovit pouze pozastavené světy'
-    });
-  }
-  
-  const resumedWorld = { ...world, status: 'active', resumedAt: new Date().toISOString() };
-  mockWorlds[worldIndex] = resumedWorld;
-  
-  console.log('▶️ Svět obnoven (LEGACY):', resumedWorld);
-  
-  res.json({
-    success: true,
-    world: resumedWorld,
-    message: `Svět "${world.name}" byl obnoven.`
-  });
-});
-
-app.delete('/api/admin/worlds/:id', (req, res) => {
-  const worldId = parseInt(req.params.id);
-  const worldIndex = mockWorlds.findIndex(w => w.id === worldId);
-  if (worldIndex === -1) {
-    return res.status(404).json({
-      success: false,
-      error: 'Svět nebyl nalezen'
-    });
-  }
-  
-  const world = mockWorlds[worldIndex];
-  mockWorlds.splice(worldIndex, 1);
-  
-  console.log('🗑️ Svět smazán (LEGACY):', world);
-  
-  res.json({
-    success: true,
-    message: `Svět "${world.name}" byl úspěšně smazán.`
-  });
-});
-
-// Public API pro seznam dostupných světů
+// PUBLIC API endpoints
 app.get('/api/worlds/public', (req, res) => {
   const publicWorlds = mockWorlds
-    .filter(world => world.status === 'active' || world.status === 'preparing')
+    .filter(world => world.status === 'active')
     .map(world => ({
       id: world.id,
       name: world.name,
       slug: world.slug,
       status: world.status,
       currentPlayers: world.currentPlayers,
-      maxPlayers: world.maxPlayers,
-      settings: {
-        speed: world.settings.speed,
-        unitSpeed: world.settings.unitSpeed
-      },
-      occupancy: Math.round((world.currentPlayers / world.maxPlayers) * 100)
+      maxPlayers: world.maxPlayers || world.settings.maxPlayers,
+      createdAt: world.createdAt
     }));
 
   res.json({
@@ -326,38 +166,40 @@ app.get('/api/worlds/public', (req, res) => {
   });
 });
 
-// Public API pro kontrola statusu světa
+// World status endpoint (pro tlačítko "Svět")  
 app.get('/api/world/:slug/status', (req, res) => {
-  const worldSlug = req.params.slug;
-  const world = mockWorlds.find(w => w.slug === worldSlug);
-
+  const slug = req.params.slug;
+  const world = mockWorlds.find(w => w.slug === slug);
+  
   if (!world) {
     return res.status(404).json({
       success: false,
       error: 'Svět nebyl nalezen',
-      status: 'not_found'
+      message: 'Zadaný svět neexistuje.'
     });
   }
 
   const response: any = {
     success: true,
-    status: world.status,
-    name: world.name,
-    slug: world.slug
+    world: {
+      id: world.id,
+      name: world.name,
+      slug: world.slug,
+      status: world.status,
+      currentPlayers: world.currentPlayers,
+      maxPlayers: world.maxPlayers || world.settings.maxPlayers
+    }
   };
 
+  // Zprávy podle statusu světa
   switch (world.status) {
     case 'active':
       response.message = 'Svět je aktivní a připraven ke hře!';
       response.canPlay = true;
-      response.stats = {
-        currentPlayers: world.currentPlayers,
-        maxPlayers: world.maxPlayers,
-        occupancy: Math.round((world.currentPlayers / world.maxPlayers) * 100)
-      };
+      response.displayMessage = `Vítejte ve světě "${world.name}"!`;
       break;
     case 'preparing':
-      response.message = 'Svět se připravuje. Brzy bude spuštěn!';
+      response.message = 'Svět se právě připravuje. Brzy bude spuštěn!';
       response.canPlay = false;
       break;
     case 'paused':
