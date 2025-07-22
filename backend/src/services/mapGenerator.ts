@@ -330,4 +330,4 @@ router.get('/worlds/:id', (req, res) => {
   });
 });
 
-export default router;
+export default MapGenerator;
