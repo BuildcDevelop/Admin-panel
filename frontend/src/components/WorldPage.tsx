@@ -1,5 +1,5 @@
 // frontend/src/components/WorldPage.tsx
-// Vylepšená komponenta pro zobrazení interaktivní herní mapy
+// Vylepšená komponenta pro zobrazení interaktivní herní mapy - CANVAS OPTIMIZED
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -71,8 +71,83 @@ export default function WorldPage(): JSX.Element {
 
   // Refs
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapGridRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
+
+  // CANVAS OPTIMALIZATION: Nakreslení dlaždic na canvas
+  const drawTilesOnCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !tiles.length) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const tileSize = 20 * viewport.scale;
+    const canvasWidth = canvas.offsetWidth;
+    const canvasHeight = canvas.offsetHeight;
+
+    // Set canvas internal size to match display size
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvasWidth * dpr;
+    canvas.height = canvasHeight * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Draw tiles
+    tiles.forEach(tile => {
+      const x = (tile.x - viewport.x) * tileSize;
+      const y = (tile.y - viewport.y) * tileSize;
+
+      // Skip tiles outside visible area
+      if (x + tileSize < 0 || y + tileSize < 0 || x > canvasWidth || y > canvasHeight) {
+        return;
+      }
+
+      // Fill tile
+      ctx.fillStyle = tile.color;
+      ctx.fillRect(x, y, tileSize, tileSize);
+
+      // Draw border
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, tileSize, tileSize);
+
+      // Hover effect
+      if (hoveredTile && hoveredTile.x === tile.x && hoveredTile.y === tile.y) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, tileSize, tileSize);
+        
+        // Slight scale effect by drawing overlay
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(x, y, tileSize, tileSize);
+      }
+    });
+  }, [tiles, viewport, hoveredTile]);
+
+  // CANVAS OPTIMIZATION: Mouse to tile coordinate conversion
+  const getMouseTileCoordinate = useCallback((e: React.MouseEvent): MapTile | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const tileSize = 20 * viewport.scale;
+    const tileX = Math.floor(x / tileSize) + viewport.x;
+    const tileY = Math.floor(y / tileSize) + viewport.y;
+
+    // Find the actual tile at this coordinate
+    return tiles.find(tile => tile.x === tileX && tile.y === tileY) || null;
+  }, [tiles, viewport]);
+
+  // CANVAS OPTIMIZATION: Redraw on dependency changes
+  useEffect(() => {
+    drawTilesOnCanvas();
+  }, [drawTilesOnCanvas]);
 
   // Výpočet velikosti viewportu na základě velikosti kontejneru
   const updateViewportSize = useCallback(() => {
@@ -127,19 +202,27 @@ export default function WorldPage(): JSX.Element {
     }
   }, [worldSlug]);
 
+  // DETERMINISTIC SEED-BASED GENERATOR: Seeded random function
+  const seededRandom = useCallback((x: number, y: number, seed: number = 123456): number => {
+    const combined = x * 374761393 + y * 668265263 + seed * 2147483647;
+    const hash = Math.abs(Math.sin(combined) * 43758.5453);
+    return hash - Math.floor(hash);
+  }, []);
+
   // Načtení dlaždic pro aktuální viewport
   const loadTilesForViewport = useCallback(async () => {
     if (!world) return;
 
     try {
-      // Dočasné mock data pro testování
+      // Dočasné mock data pro testování - DETERMINISTICKÉ
       // V reálné implementaci by se volalo: `/api/admin/world/${world.id}/map`
       const mockTiles: MapTile[] = [];
       
       for (let y = viewport.y; y < viewport.y + viewport.height && y < world.mapSize.height; y++) {
         for (let x = viewport.x; x < viewport.x + viewport.width && x < world.mapSize.width; x++) {
-          // Jednoduchý generátor pro testování
+          // Deterministický noise generátor
           const noise = Math.sin(x * 0.1) * Math.cos(y * 0.1);
+          const riverSeed = seededRandom(x, y, world.seed); // FIXED: Deterministický seed
           let terrainType: MapTile['terrainType'];
           let color: string;
 
@@ -152,7 +235,7 @@ export default function WorldPage(): JSX.Element {
           } else if (noise < -0.5) {
             terrainType = 'lake';
             color = '#1E90FF';
-          } else if (Math.abs(x % 50 - 25) < 2 && Math.random() > 0.7) {
+          } else if (Math.abs(x % 50 - 25) < 2 && riverSeed > 0.7) { // FIXED: Použit deterministický seed
             terrainType = 'river';
             color = '#4682B4';
           } else {
@@ -169,7 +252,7 @@ export default function WorldPage(): JSX.Element {
     } catch (err) {
       console.error('Chyba při načítání dlaždic:', err);
     }
-  }, [world, viewport]);
+  }, [world, viewport, seededRandom]);
 
   // Použít efekty
   useEffect(() => {
@@ -203,6 +286,14 @@ export default function WorldPage(): JSX.Element {
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
 
+    // CANVAS OPTIMIZATION: Handle hover on canvas
+    const tile = getMouseTileCoordinate(e);
+    if (tile && (!hoveredTile || tile.x !== hoveredTile.x || tile.y !== hoveredTile.y)) {
+      setHoveredTile(tile);
+    } else if (!tile && hoveredTile) {
+      setHoveredTile(null);
+    }
+
     if (isDragging && world) {
       const deltaX = (dragStart.x - e.clientX) / (20 * viewport.scale);
       const deltaY = (dragStart.y - e.clientY) / (20 * viewport.scale);
@@ -218,7 +309,7 @@ export default function WorldPage(): JSX.Element {
 
       setViewport(prev => ({ ...prev, x: newX, y: newY }));
     }
-  }, [isDragging, dragStart, dragOffset, viewport.scale, world, viewport.width, viewport.height]);
+  }, [isDragging, dragStart, dragOffset, viewport.scale, world, viewport.width, viewport.height, getMouseTileCoordinate, hoveredTile]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -236,7 +327,7 @@ export default function WorldPage(): JSX.Element {
     }));
   }, [viewport.scale]);
 
-  // Hover handlers pro dlaždice
+  // Hover handlers pro dlaždice (zachované pro kompatibilitu, ale už se nepoužívají)
   const handleTileHover = useCallback((tile: MapTile) => {
     setHoveredTile(tile);
   }, []);
@@ -244,30 +335,6 @@ export default function WorldPage(): JSX.Element {
   const handleTileLeave = useCallback(() => {
     setHoveredTile(null);
   }, []);
-
-  // Virtualizované vykreslování dlaždic
-  const renderedTiles = useMemo(() => {
-    const tileSize = 20 * viewport.scale;
-    
-    return tiles.map(tile => (
-      <div
-        key={`${tile.x}-${tile.y}`}
-        className="map-tile"
-        style={{
-          position: 'absolute',
-          left: `${(tile.x - viewport.x) * tileSize}px`,
-          top: `${(tile.y - viewport.y) * tileSize}px`,
-          width: `${tileSize}px`,
-          height: `${tileSize}px`,
-          backgroundColor: tile.color,
-          borderRight: `1px solid rgba(0,0,0,0.1)`,
-          borderBottom: `1px solid rgba(0,0,0,0.1)`
-        }}
-        onMouseEnter={() => handleTileHover(tile)}
-        onMouseLeave={handleTileLeave}
-      />
-    ));
-  }, [tiles, viewport, handleTileHover, handleTileLeave]);
 
   // Minimap
   const renderMinimap = () => {
@@ -378,9 +445,16 @@ export default function WorldPage(): JSX.Element {
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
       >
-        <div ref={mapGridRef} className="map-grid">
-          {renderedTiles}
-        </div>
+        {/* CANVAS OPTIMIZATION: Nahrazuje map-grid div */}
+        <canvas
+          ref={canvasRef}
+          className="map-canvas"
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'block'
+          }}
+        />
 
         {/* Minimap */}
         {renderMinimap()}
