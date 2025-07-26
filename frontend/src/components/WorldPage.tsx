@@ -95,7 +95,7 @@ export default function WorldPage(): JSX.Element {
       setError(null);
 
       // Získání informací o světě
-      const worldResponse = await fetch(`http://localhost:3001/api/worlds/${worldSlug}`);
+      const worldResponse = await fetch(`http://localhost:3001/api/world/${worldSlug}/status`);
       if (!worldResponse.ok) {
         throw new Error('Svět nebyl nalezen');
       }
