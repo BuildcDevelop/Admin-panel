@@ -22,6 +22,7 @@ interface World {
 
 interface CreateWorldForm {
   name: string;
+  worldSize: string; // PŘIDÁNO: pole pro velikost světa
   speed: number;
   unitSpeed: number;
   barbarianSpawnChance: number;
@@ -62,6 +63,7 @@ const AdminWorldsPage: React.FC = () => {
     
   const [createForm, setCreateForm] = useState<CreateWorldForm>({
     name: '',
+    worldSize: '500x500', // PŘIDÁNO: výchozí velikost světa
     speed: 1.0,
     unitSpeed: 1.0,
     barbarianSpawnChance: 100,
@@ -116,6 +118,7 @@ const handleOpenWorld = (worldSlug: string) => {
         },
         body: JSON.stringify({
           name: createForm.name,
+          worldSize: createForm.worldSize, // PŘIDÁNO: velikost světa do API volání
           settings: {
             speed: createForm.speed,
             unitSpeed: createForm.unitSpeed,
@@ -132,6 +135,7 @@ const handleOpenWorld = (worldSlug: string) => {
         setShowCreateForm(false);
         setCreateForm({
           name: '',
+          worldSize: '500x500', // PŘIDÁNO: reset velikosti světa
           speed: 1.0,
           unitSpeed: 1.0,
           barbarianSpawnChance: 100,
@@ -441,6 +445,21 @@ const handleOpenWorld = (worldSlug: string) => {
                 />
               </div>
 
+              {/* PŘIDÁNO: Pole pro velikost světa */}
+              <div className="admin-worlds__form-group">
+                <label htmlFor="worldSize">Velikost světa</label>
+                <select
+                  id="worldSize"
+                  value={createForm.worldSize}
+                  onChange={(e) => setCreateForm({...createForm, worldSize: e.target.value})}
+                >
+                  <option value="100x100">100x100 (Malý)</option>
+                  <option value="500x500">500x500 (Střední)</option>
+                  <option value="1000x1000">1000x1000 (Velký)</option>
+                  <option value="2000x2000">2000x2000 (Obří)</option>
+                </select>
+              </div>
+
               <div className="admin-worlds__form-row">
                 <div className="admin-worlds__form-group">
                   <label htmlFor="speed">Rychlost hry</label>
@@ -636,6 +655,103 @@ const handleOpenWorld = (worldSlug: string) => {
           )}
         </div>
 
+        {/* Edit World Modal */}
+        {editingWorld && (
+          <div className="admin-worlds__modal-overlay">
+            <div className="admin-worlds__modal">
+              <div className="admin-worlds__modal-header">
+                <h3 className="admin-worlds__modal-title">Editovat svět: {editingWorld.name}</h3>
+                <button
+                  onClick={() => setEditingWorld(null)}
+                  className="admin-worlds__modal-close"
+                  disabled={editLoading}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="admin-worlds__modal-content">
+                <form onSubmit={handleEditWorld}>
+                  <div className="admin-worlds__form-row">
+                    <div className="admin-worlds__form-group">
+                      <label htmlFor="editSpeed">Rychlost hry</label>
+                      <select
+                        id="editSpeed"
+                        value={editForm.speed}
+                        onChange={(e) => setEditForm({...editForm, speed: Number(e.target.value)})}
+                      >
+                        <option value={0.5}>0.5x (Pomalá)</option>
+                        <option value={1.0}>1.0x (Normální)</option>
+                        <option value={2.0}>2.0x (Rychlá)</option>
+                        <option value={5.0}>5.0x (Velmi rychlá)</option>
+                      </select>
+                    </div>
+
+                    <div className="admin-worlds__form-group">
+                      <label htmlFor="editUnitSpeed">Rychlost jednotek</label>
+                      <select
+                        id="editUnitSpeed"
+                        value={editForm.unitSpeed}
+                        onChange={(e) => setEditForm({...editForm, unitSpeed: Number(e.target.value)})}
+                      >
+                        <option value={0.5}>0.5x (Pomalá)</option>
+                        <option value={1.0}>1.0x (Normální)</option>
+                        <option value={2.0}>2.0x (Rychlá)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="admin-worlds__form-row">
+                    <div className="admin-worlds__form-group">
+                      <label htmlFor="editBarbarianChance">Šance na barbary (%)</label>
+                      <input
+                        id="editBarbarianChance"
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={editForm.barbarianSpawnChance}
+                        onChange={(e) => setEditForm({...editForm, barbarianSpawnChance: Number(e.target.value)})}
+                      />
+                    </div>
+
+                    <div className="admin-worlds__form-group">
+                      <label htmlFor="editMaxPlayers">Maximum hráčů</label>
+                      <select
+                        id="editMaxPlayers"
+                        value={editForm.maxPlayers}
+                        onChange={(e) => setEditForm({...editForm, maxPlayers: Number(e.target.value)})}
+                      >
+                        <option value={100}>100 hráčů</option>
+                        <option value={500}>500 hráčů</option>
+                        <option value={1000}>1000 hráčů</option>
+                        <option value={2000}>2000 hráčů</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="admin-worlds__modal-actions">
+                    <button
+                      type="button"
+                      onClick={() => setEditingWorld(null)}
+                      className="admin-worlds__btn admin-worlds__btn--secondary"
+                      disabled={editLoading}
+                    >
+                      Zrušit
+                    </button>
+                    <button
+                      type="submit"
+                      className="admin-worlds__btn admin-worlds__btn--primary"
+                      disabled={editLoading}
+                    >
+                      {editLoading ? 'Ukládá se...' : 'Uložit změny'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Activate Confirmation Modal */}
         {showActivateConfirm && (
           <div className="admin-worlds__modal-overlay">
@@ -743,7 +859,7 @@ const handleOpenWorld = (worldSlug: string) => {
                   <br /><br />
                   <strong>Svět bude pozastaven a hráčům se zobrazí informační zpráva:</strong>
                   <br />
-                  <em style={{color: '#a7f3d0'}}>"Svět byl z technických důvodů pozastaven."</em>
+                  <em style={{color: '#a7f3d0'}}>"Svět byl z technických důvodů pozastaven. Brzy bude obnovena hra."</em>
                 </p>
               </div>
               
@@ -786,7 +902,7 @@ const handleOpenWorld = (worldSlug: string) => {
                 <p className="admin-worlds__modal-text">
                   Opravdu chcete obnovit svět "{worlds.find(w => w.id === showResumeConfirm)?.name}"?
                   <br /><br />
-                  <strong>Svět bude znovu aktivní a hráči se budou moci připojit.</strong>
+                  <strong>Hra bude obnovena a hráči budou moci pokračovat.</strong>
                 </p>
               </div>
               
