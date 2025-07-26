@@ -38,6 +38,9 @@ const TERRAIN_NAMES = {
   lake: 'Jezero'
 };
 
+// OPTIMALIZACE 1: Cache pro terén (mimo komponentu pro lepší výkon)
+const TERRAIN_CACHE = new Map<string, MapTile>();
+
 export default function WorldPage(): JSX.Element {
   const { worldSlug } = useParams<{ worldSlug: string }>();
   const navigate = useNavigate();
@@ -69,6 +72,7 @@ export default function WorldPage(): JSX.Element {
   // Refs
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapGridRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number>();
 
   // Výpočet velikosti viewportu na základě velikosti kontejneru
   const updateViewportSize = useCallback(() => {
