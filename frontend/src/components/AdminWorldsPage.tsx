@@ -111,27 +111,34 @@ const handleOpenWorld = (worldSlug: string) => {
     try {
       setCreateLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:3001/api/admin/worlds', {
+      const [width, height] = createForm.worldSize.split('x').map(Number); // PŘIDÁNO: rozdělení velikosti světa
+      console.log(`📤 Vytváří se svět "${createForm.name}" s velikostí ${width}x${height}`);
+      const response = await fetch('http://localhost:3001/api/admin/world/create', { // PŘIDÁNO: URL pro vytvoření světa
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: createForm.name,
-          worldSize: createForm.worldSize, // PŘIDÁNO: velikost světa do API volání
-          settings: {
-            speed: createForm.speed,
-            unitSpeed: createForm.unitSpeed,
-            barbarianSpawnChance: createForm.barbarianSpawnChance,
-            maxPlayers: createForm.maxPlayers
-          }
-        })
-      });
+      body: JSON.stringify({
+        name: createForm.name,
+        mapSize: {
+          width: width,
+          height: height
+        },
+        seed: Math.floor(Math.random() * 1000000), // Volitelné: náhodný seed
+        settings: {
+          speed: createForm.speed,
+          unitSpeed: createForm.unitSpeed,
+          barbarianSpawnChance: createForm.barbarianSpawnChance,
+          maxPlayers: createForm.maxPlayers
+        }
+      })
+    });
 
       const data = await response.json();
+      console.log('📥 Response z API:', data);
 
       if (response.ok && data.success) {
-        setSuccess(data.message);
+        setSuccess(`Svět "${data.world.name}" s mapou ${width}x${height} byl vytvořen úspěšně!`); // PŘIDÁNO: úspěšná zpráva s velikostí mapy
         setShowCreateForm(false);
         setCreateForm({
           name: '',
@@ -146,11 +153,11 @@ const handleOpenWorld = (worldSlug: string) => {
         setError(data.error || 'Chyba při vytváření světa');
       }
     } catch (err) {
-      setError('Chyba při vytváření světa');
-      console.error('Error creating world:', err);
-    } finally {
-      setCreateLoading(false);
-    }
+    console.error('❌ Error creating world:', err);
+    setError('Chyba při vytváření světa');
+  } finally {
+    setCreateLoading(false);
+  }
   };
 
   const handleEditWorld = async (e: React.FormEvent) => {

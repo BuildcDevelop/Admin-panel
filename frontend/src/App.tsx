@@ -47,7 +47,7 @@ function Dashboard() {
               borderRadius: '0.25rem',
               fontFamily: 'monospace'
             }}>
-              node index.js
+              node index.ts
             </code>
           </div>
         )}

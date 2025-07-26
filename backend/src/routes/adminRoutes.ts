@@ -6,6 +6,30 @@ import { Pool } from 'pg';
 import MapGenerator from '../services/mapGenerator';
 import { MapTile, TerrainUtils } from '../models/Terrain';
 
+// Na začátek adminRoutes.ts (po importech, před definicí pool):
+console.log('🔍 ADMIN ROUTES DEBUG:');
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+console.log('DATABASE_URL length:', process.env.DATABASE_URL?.length);
+console.log('DATABASE_URL preview:', process.env.DATABASE_URL?.substring(0, 30) + '...');
+
+// Zkusme parsovat URL
+if (process.env.DATABASE_URL) {
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    console.log('URL parsed successfully:');
+    console.log('  protocol:', url.protocol);
+    console.log('  username:', url.username);
+    console.log('  password exists:', !!url.password);
+    console.log('  password type:', typeof url.password);
+    console.log('  password length:', url.password?.length);
+    console.log('  hostname:', url.hostname);
+    console.log('  port:', url.port);
+    console.log('  pathname:', url.pathname);
+  } catch (urlError) {
+  console.error('❌ Error parsing DATABASE_URL:', urlError instanceof Error ? urlError.message : String(urlError));
+}
+}
+
 const router = express.Router();
 
 // PostgreSQL pool connection (přidat do vaší konfigurace)

@@ -185,14 +185,20 @@ export default function WorldPage(): JSX.Element {
       }
 
       // Pro nyní použijeme mock data, dokud nebude implementována mapa v databázi
-      const mockWorld: WorldData = {
-        id: worldData.world.id,
-        name: worldData.world.name,
-        mapSize: { width: 100, height: 100 },
-        seed: 123456
-      };
+      const actualWorld: WorldData = {
+      id: worldData.world.id,
+      name: worldData.world.name,
+      mapSize: {
+        // ✅ KLÍČOVÁ ZMĚNA: Načítat skutečnou velikost z databáze
+        width: worldData.world.map_size_x || worldData.world.mapSize?.width || 100,
+        height: worldData.world.map_size_y || worldData.world.mapSize?.height || 100
+      },
+      seed: worldData.world.seed || 123456
+    };
+
+    console.log(`🌍 Načten svět: ${actualWorld.name} (${actualWorld.mapSize.width}x${actualWorld.mapSize.height})`);
+    setWorld(actualWorld);
       
-      setWorld(mockWorld);
 
     } catch (err) {
       console.error('Chyba při načítání světa:', err);
