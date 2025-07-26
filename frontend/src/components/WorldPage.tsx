@@ -84,8 +84,8 @@ export default function WorldPage(): JSX.Element {
       
       setViewport(prev => ({
         ...prev,
-        width: Math.min(newWidth, world?.mapSize.width || 1000),
-        height: Math.min(newHeight, world?.mapSize.height || 1000)
+        width: Math.min(newWidth, world?.mapSize.width || 100),
+        height: Math.min(newHeight, world?.mapSize.height || 100)
       }));
     }
   }, [viewport.scale, world?.mapSize]);
@@ -113,7 +113,7 @@ export default function WorldPage(): JSX.Element {
       const mockWorld: WorldData = {
         id: worldData.world.id,
         name: worldData.world.name,
-        mapSize: { width: 1000, height: 1000 },
+        mapSize: { width: 100, height: 100 },
         seed: 123456
       };
       
