@@ -1,7 +1,7 @@
 // admin-panel/backend/src/services/vervenAPI.ts
 import axios from 'axios';
 
-const VERVEN_API_BASE = process.env.VERVEN_API_URL || 'http://localhost:3000/api';
+const VERVEN_API_BASE = process.env.VERVEN_API_URL || 'http://localhost:4001/api';
 
 export class VervenAPIClient {
   private baseURL: string;
