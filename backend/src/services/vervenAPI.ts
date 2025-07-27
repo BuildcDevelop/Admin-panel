@@ -1,6 +1,7 @@
-// admin-panel/backend/src/services/vervenAPI.ts
+// backend/src/services/vervenAPI.ts
 import axios from 'axios';
 
+// ✅ Správný port 4001 místo 3000  
 const VERVEN_API_BASE = process.env.VERVEN_API_URL || 'http://localhost:4001/api';
 
 export class VervenAPIClient {
@@ -8,25 +9,29 @@ export class VervenAPIClient {
   
   constructor() {
     this.baseURL = VERVEN_API_BASE;
+    console.log(`🔗 VervenAPI client configured for: ${this.baseURL}`);
   }
   
-  // Místo lokální PostgreSQL, volej Verven
   async createWorld(worldData: any) {
+    console.log(`🔨 Creating world via: ${this.baseURL}/admin/worlds`);
     const response = await axios.post(`${this.baseURL}/admin/worlds`, worldData);
     return response.data;
   }
   
   async getWorlds() {
+    console.log(`🌍 Getting worlds from: ${this.baseURL}/admin/worlds`);
     const response = await axios.get(`${this.baseURL}/admin/worlds`);
     return response.data;
   }
   
   async getWorldDetail(worldId: string) {
+    console.log(`🔍 Getting world ${worldId} from: ${this.baseURL}/admin/worlds/${worldId}`);
     const response = await axios.get(`${this.baseURL}/admin/worlds/${worldId}`);
     return response.data;
   }
   
   async deleteWorld(worldId: string) {
+    console.log(`🗑️ Deleting world ${worldId} via: ${this.baseURL}/admin/worlds/${worldId}`);
     const response = await axios.delete(`${this.baseURL}/admin/worlds/${worldId}`);
     return response.data;
   }
@@ -41,7 +46,6 @@ export class VervenAPIClient {
     return response.data;
   }
   
-  // Pro budoucí admin funkce
   async getPlayers(worldId?: string) {
     const url = worldId ? `/admin/players?worldId=${worldId}` : '/admin/players';
     const response = await axios.get(`${this.baseURL}${url}`);
@@ -54,6 +58,5 @@ export class VervenAPIClient {
   }
 }
 
-// Default export
 const vervenAPI = new VervenAPIClient();
 export default vervenAPI;
